@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search, ChevronRight, ChevronLeft, Globe, Monitor, User, Lock, Database, Plug,
   FileText, Link, Settings, X, Plus, Code, MousePointer, Variable, Shield, Users,
@@ -15,14 +15,40 @@ const theme = {
   accentMuted: '#E8E4F9',
 };
 
+// Valid routes for the app
+const validRoutes = ['instructions', 'tools', 'mcp', 'knowledge', 'logs', 'deploy', 'pricing'];
+
+// Get initial view from URL hash
+const getInitialView = () => {
+  const hash = window.location.hash.replace('#/', '').replace('#', '');
+  return validRoutes.includes(hash) ? hash : 'instructions';
+};
+
 // Main App Component
 export default function AgentBuilderComplete() {
-  const [currentView, setCurrentView] = useState('instructions');
+  const [currentView, setCurrentView] = useState(getInitialView);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(null);
   const [activeCategory, setActiveCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [instructionText, setInstructionText] = useState('You are a knowledge agent, be polite and answer only from the knowledge base, nothing outside.');
+
+  // Update URL hash when view changes
+  useEffect(() => {
+    window.location.hash = `#/${currentView}`;
+  }, [currentView]);
+
+  // Listen for browser back/forward navigation
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#/', '').replace('#', '');
+      if (validRoutes.includes(hash) && hash !== currentView) {
+        setCurrentView(hash);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [currentView]);
 
   // Sample data
   const [frontendActions, setFrontendActions] = useState([
