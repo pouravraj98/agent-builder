@@ -1,1 +1,21 @@
 @import "tailwindcss";
+
+/* Custom theme colors */
+:root {
+  --accent: #6852D6;
+  --accent-hover: #5A47B8;
+  --accent-light: #F3F1FD;
+  --accent-muted: #E8E4F9;
+}
+
+/* Custom utility classes for accent color */
+.bg-accent { background-color: var(--accent); }
+.bg-accent-hover:hover { background-color: var(--accent-hover); }
+.bg-accent-light { background-color: var(--accent-light); }
+.bg-accent-muted { background-color: var(--accent-muted); }
+.text-accent { color: var(--accent); }
+.text-accent-hover:hover { color: var(--accent-hover); }
+.border-accent { border-color: var(--accent); }
+.ring-accent { --tw-ring-color: var(--accent); }
+.focus\:ring-accent:focus { --tw-ring-color: var(--accent); }
+.border-r-accent-muted { border-right-color: var(--accent-muted); }
