@@ -1574,8 +1574,7 @@ function CreateModal({
 // Pricing View Component
 function PricingView() {
   const [billingCycle, setBillingCycle] = useState('annual');
-  const [expandedFaq, setExpandedFaq] = useState(null);
-  const [showAllFeatures, setShowAllFeatures] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
 
   const plans = [
     {
@@ -1587,8 +1586,6 @@ function PricingView() {
       priceSubtext: 'Credit bundles starting at $25',
       credits: '1,000 Starter Credits',
       popular: false,
-      cta: 'Start Free Trial',
-      ctaStyle: 'outline',
       features: [
         'Plug-and-play no-code web widget',
         'SOC 2, ISO 27001, GDPR compliant',
@@ -1605,8 +1602,6 @@ function PricingView() {
       priceSubtext: 'Billed annually',
       credits: '2,500 Monthly Credits',
       popular: true,
-      cta: 'Start Free Trial',
-      ctaStyle: 'filled',
       features: [
         'UI Kits for all popular web & mobile frameworks',
         'AI moderation & guardrails',
@@ -1627,8 +1622,6 @@ function PricingView() {
       priceSubtext: 'Billed annually',
       credits: '25,000 Monthly Credits',
       popular: false,
-      cta: 'Start Free Trial',
-      ctaStyle: 'filled',
       features: [
         'Everything in Core, plus:',
         'Tasks, workflows & multi-model support',
@@ -1639,113 +1632,6 @@ function PricingView() {
     },
   ];
 
-  const featureCategories = [
-    {
-      name: 'Usage',
-      features: [
-        { name: '# of Agents', web: '1', core: '3', plus: 'Unlimited' },
-        { name: 'Message storage', web: 'Unlimited', core: 'Unlimited', plus: 'Unlimited' },
-        { name: 'Message retention', web: '6 months', core: '6 months', plus: '6 months' },
-        { name: 'Images & files storage', web: 'Unlimited', core: 'Unlimited', plus: 'Unlimited' },
-        { name: 'No hidden costs/overages', web: true, core: true, plus: true },
-      ],
-    },
-    {
-      name: 'Agent Builder',
-      features: [
-        { name: 'Natural language agent builder', web: true, core: true, plus: true },
-        { name: 'Tasks / Workflows', web: true, core: true, plus: true },
-        { name: '100+ Tools', web: false, core: true, plus: true },
-        { name: 'Front-end actions', web: false, core: true, plus: true },
-        { name: 'Tone & style customization', web: true, core: true, plus: true },
-        { name: 'Multi-model support', web: true, core: true, plus: true },
-        { name: 'Premium models', web: true, core: true, plus: true },
-      ],
-    },
-    {
-      name: 'Knowledge Base',
-      features: [
-        { name: 'Upload any file or document', web: true, core: true, plus: true },
-        { name: 'Train from any website', web: true, core: true, plus: true },
-        { name: 'Sync from Google Drive, Notion & more', web: false, core: true, plus: true },
-      ],
-    },
-    {
-      name: 'Advanced',
-      features: [
-        { name: 'CometChat MCP', web: true, core: true, plus: true },
-        { name: 'Human-in-the-loop', web: true, core: true, plus: true },
-        { name: 'User Authentication', web: false, core: true, plus: true },
-        { name: 'Frontend Context Sharing', web: false, core: true, plus: true },
-        { name: 'Multi-Party Coordinator', web: false, core: false, plus: true },
-        { name: 'Human Handoff', web: false, core: false, plus: true },
-        { name: 'Agent User Memory', web: false, core: false, plus: true },
-        { name: 'Scheduled / Pro-active Events', web: false, core: false, plus: true },
-        { name: 'Role based access control', web: false, core: false, plus: true },
-      ],
-    },
-    {
-      name: 'Deploy',
-      features: [
-        { name: 'Cross-platform Deployment', web: 'Web Only', core: true, plus: true },
-        { name: 'Streaming support', web: true, core: true, plus: true },
-        { name: 'Cards & Charts', web: true, core: true, plus: true },
-        { name: 'Custom UI Widgets Support', web: true, core: true, plus: true },
-        { name: 'Voice Messages', web: true, core: true, plus: true },
-        { name: 'No "Powered by CometChat" Branding', web: false, core: true, plus: true },
-        { name: 'Analytics & Observability', web: true, core: true, plus: true },
-      ],
-    },
-    {
-      name: 'Moderation & Guardrails',
-      features: [
-        { name: 'Rule-based Moderation', web: true, core: true, plus: true },
-        { name: 'AI Powered Moderation', web: false, core: true, plus: true },
-        { name: 'Prompt Injection Protection', web: false, core: true, plus: true },
-        { name: 'Jailbreak Prevention', web: false, core: true, plus: true },
-        { name: 'Hallucination Guardrails', web: false, core: true, plus: true },
-        { name: 'Custom prompts', web: false, core: false, plus: true },
-      ],
-    },
-    {
-      name: 'Security & Compliance',
-      features: [
-        { name: 'ISO 27001 & SOC 2', web: true, core: true, plus: true },
-        { name: 'GDPR & CCPA', web: true, core: true, plus: true },
-        { name: 'HIPAA w/ BAA', web: false, core: true, plus: true },
-        { name: '2FA (Dashboard)', web: true, core: true, plus: true },
-        { name: 'Team Role Based Access', web: false, core: true, plus: true },
-        { name: 'SSO (SAML, LDAP)', web: false, core: false, plus: true },
-        { name: 'Audit Logs', web: false, core: false, plus: true },
-      ],
-    },
-  ];
-
-  const faqs = [
-    { q: 'Do you offer HIPAA compliance?', a: 'Yes, HIPAA compliance with BAA is available on Core and Plus plans. Contact us to set up your BAA.' },
-    { q: 'Do you offer multi-tenancy?', a: 'Yes, multi-tenancy is available on Core and Plus plans, allowing you to create isolated instances for different customers.' },
-    { q: 'What are Monthly Active Users?', a: 'Monthly Active Users (MAUs) are unique users who interact with your agent within a calendar month.' },
-    { q: 'What happens if I exceed my plan\'s limits?', a: 'You can purchase additional credit bundles at any time. Credits are charged at $0.01 per credit.' },
-    { q: 'Can I use voice and video without using text chat?', a: 'Yes, you can use voice messages independently. Full voice and video calling is part of our Real-Time Communication product.' },
-    { q: 'Do you offer a free trial?', a: 'Yes! All plans include 1,000 free credits to get started. No credit card required.' },
-  ];
-
-  const displayedCategories = showAllFeatures ? featureCategories : featureCategories.slice(0, 3);
-
-  const renderValue = (value) => {
-    if (value === true) {
-      return (
-        <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: theme.accentMuted }}>
-          <Check className="w-3 h-3" style={{ color: theme.accent }} />
-        </div>
-      );
-    } else if (value === false) {
-      return <span className="text-gray-300">—</span>;
-    } else {
-      return <span className="text-sm text-gray-600">{value}</span>;
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Header - Dashboard Style */}
@@ -1754,29 +1640,23 @@ function PricingView() {
           <h2 className="text-xl font-semibold text-gray-900">Pricing</h2>
           <p className="text-gray-500 mt-1">Simple, transparent, predictable. Know exactly what you'll pay.</p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Billing Toggle */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg">
-            <span className={`text-xs ${billingCycle === 'monthly' ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>Monthly</span>
-            <button
-              onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annual' : 'monthly')}
-              className="relative w-9 h-5 rounded-full transition-colors"
-              style={{ backgroundColor: billingCycle === 'annual' ? theme.accent : '#d1d5db' }}
-            >
-              <div
-                className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${
-                  billingCycle === 'annual' ? 'translate-x-4' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-            <span className={`text-xs ${billingCycle === 'annual' ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>Annual</span>
-            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded" style={{ backgroundColor: theme.accentLight, color: theme.accent }}>
-              -20%
-            </span>
-          </div>
-          <button className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-            Documentation
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg">
+          <span className={`text-xs ${billingCycle === 'monthly' ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>Monthly</span>
+          <button
+            onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annual' : 'monthly')}
+            className="relative w-9 h-5 rounded-full transition-colors"
+            style={{ backgroundColor: billingCycle === 'annual' ? theme.accent : '#d1d5db' }}
+          >
+            <div
+              className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${
+                billingCycle === 'annual' ? 'translate-x-4' : 'translate-x-0.5'
+              }`}
+            />
           </button>
+          <span className={`text-xs ${billingCycle === 'annual' ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>Annual</span>
+          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded" style={{ backgroundColor: theme.accentLight, color: theme.accent }}>
+            -20%
+          </span>
         </div>
       </div>
 
@@ -1800,10 +1680,11 @@ function PricingView() {
             <p className="text-xs text-gray-500">Included with trial</p>
           </div>
           <button
+            onClick={() => setShowContactModal(true)}
             className="px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-colors"
             style={{ backgroundColor: theme.accent }}
           >
-            Upgrade Plan
+            Contact us
           </button>
         </div>
       </div>
@@ -1849,31 +1730,22 @@ function PricingView() {
             </div>
 
             <button
-              className={`w-full py-2.5 rounded-lg text-sm font-medium mb-4 transition-colors ${
-                plan.ctaStyle === 'filled'
-                  ? 'text-white hover:opacity-90'
-                  : 'border hover:bg-gray-50'
-              }`}
-              style={plan.ctaStyle === 'filled'
-                ? { backgroundColor: theme.accent }
-                : { borderColor: theme.accent, color: theme.accent }
-              }
+              onClick={() => setShowContactModal(true)}
+              className="w-full py-2.5 rounded-lg text-sm font-medium mb-4 transition-colors text-white hover:opacity-90"
+              style={{ backgroundColor: theme.accent }}
             >
-              {plan.cta}
+              Contact us
             </button>
 
             <div className="border-t border-gray-100 pt-4 flex-1">
               <p className="text-sm font-medium text-gray-700 mb-3">Features:</p>
               <ul className="space-y-2">
-                {plan.features.slice(0, 5).map((feature, idx) => (
+                {plan.features.map((feature, idx) => (
                   <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
                     <Check className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: theme.accent }} />
                     {feature}
                   </li>
                 ))}
-                {plan.features.length > 5 && (
-                  <li className="text-sm" style={{ color: theme.accent }}>+{plan.features.length - 5} more</li>
-                )}
               </ul>
             </div>
           </div>
@@ -1889,6 +1761,7 @@ function PricingView() {
             AI agents, built and deployed end-to-end. From design to deployment, we handle the full lifecycle.
           </p>
           <button
+            onClick={() => setShowContactModal(true)}
             className="w-full py-2.5 rounded-lg text-sm font-medium transition-colors border hover:opacity-90"
             style={{ borderColor: theme.accent, color: theme.accent }}
           >
@@ -1897,96 +1770,44 @@ function PricingView() {
         </div>
       </div>
 
-      {/* Detailed Plan Comparison */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {/* Section Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900">Detailed Plan Comparison</h3>
-            <p className="text-xs text-gray-500">Compare features across all plans</p>
-          </div>
-        </div>
-
-        {/* Table Header */}
-        <div className="grid grid-cols-4 gap-4 px-6 py-3 border-b border-gray-200 bg-gray-50">
-          <div className="text-xs font-medium text-gray-500">Features</div>
-          {plans.map((plan) => (
-            <div key={plan.id} className="text-center">
-              <div className="flex items-center justify-center gap-1">
-                <span className="text-xs font-semibold text-gray-900">{plan.name}</span>
-                {plan.popular && (
-                  <span
-                    className="px-1.5 py-0.5 text-[9px] font-medium text-white rounded"
-                    style={{ backgroundColor: theme.accent }}
-                  >
-                    Popular
-                  </span>
-                )}
-              </div>
-              <div className="text-[10px] text-gray-500">
-                {plan.price ? `$${plan.price}/mo` : 'PAYG'}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Feature Categories */}
-        {displayedCategories.map((category) => (
-          <div key={category.name}>
-            <div className="px-6 py-2 bg-gray-50 border-b border-gray-100">
-              <h4 className="text-xs font-semibold text-gray-700">{category.name}</h4>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {category.features.map((feature, idx) => (
-                <div key={idx} className="grid grid-cols-4 gap-4 px-6 py-2.5 items-center hover:bg-gray-50 transition-colors">
-                  <div className="text-xs text-gray-700">{feature.name}</div>
-                  <div className="flex justify-center">{renderValue(feature.web)}</div>
-                  <div className="flex justify-center">{renderValue(feature.core)}</div>
-                  <div className="flex justify-center">{renderValue(feature.plus)}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-
-        {/* Expand/Collapse Button */}
-        <div className="px-6 py-3 border-t border-gray-200 flex justify-center">
-          <button
-            onClick={() => setShowAllFeatures(!showAllFeatures)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors hover:bg-gray-50"
-            style={{ borderColor: theme.accent, color: theme.accent }}
-          >
-            {showAllFeatures ? 'Show less' : 'Expand all features'}
-            <ChevronDown className={`w-4 h-4 transition-transform ${showAllFeatures ? 'rotate-180' : ''}`} />
-          </button>
-        </div>
+      {/* View Full Pricing Link */}
+      <div className="text-center">
+        <a
+          href="https://www.cometchat.com/pricing"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 text-sm font-medium hover:opacity-80 transition-opacity"
+          style={{ color: theme.accent }}
+        >
+          View full pricing details
+          <ExternalLink className="w-4 h-4" />
+        </a>
       </div>
 
-      {/* FAQ Section */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-900">Frequently Asked Questions</h3>
-          <p className="text-xs text-gray-500">Got questions? We've got answers.</p>
-        </div>
-        <div className="divide-y divide-gray-100">
-          {faqs.map((faq, idx) => (
-            <div key={idx}>
-              <button
-                onClick={() => setExpandedFaq(expandedFaq === idx ? null : idx)}
-                className="w-full px-6 py-3 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+      {/* Contact Modal */}
+      {showContactModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="p-6 text-center">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                style={{ backgroundColor: theme.accentLight }}
               >
-                <span className="text-sm text-gray-900">{faq.q}</span>
-                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${expandedFaq === idx ? 'rotate-180' : ''}`} />
+                <Check className="w-8 h-8" style={{ color: theme.accent }} />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Thank you for your interest!</h3>
+              <p className="text-gray-500 mb-6">Our team will get back to you shortly.</p>
+              <button
+                onClick={() => setShowContactModal(false)}
+                className="px-6 py-2.5 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-colors"
+                style={{ backgroundColor: theme.accent }}
+              >
+                Got it
               </button>
-              {expandedFaq === idx && (
-                <div className="px-6 pb-3">
-                  <p className="text-sm text-gray-600">{faq.a}</p>
-                </div>
-              )}
             </div>
-          ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
