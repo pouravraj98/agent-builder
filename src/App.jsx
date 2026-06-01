@@ -1601,17 +1601,54 @@ function CreateModal({
 function PricingView() {
   const [billingCycle, setBillingCycle] = useState('annual');
   const [showContactModal, setShowContactModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('plans');
+
+  // Account lifecycle state
+  // 'trial-active' | 'trial-ending' | 'trial-expired' | 'paid-active'
+  const [accountState, setAccountState] = useState('trial-active');
+  const [currentPlanId, setCurrentPlanId] = useState('core');
+
+  // Checkout flow
+  const [checkout, setCheckout] = useState(null); // null | { planId, step: 'payment' | 'success' }
+  const [cardName, setCardName] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
+  const [billingEmail, setBillingEmail] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Trial credit numbers — used in banner
+  const trialCreditsUsed = accountState === 'trial-ending' ? 920 : accountState === 'trial-expired' ? 1000 : 347;
+  const trialCreditsTotal = 1000;
+  const trialDaysLeft = accountState === 'trial-ending' ? 3 : accountState === 'trial-active' ? 11 : 0;
+
+  // Credits state
+  const [buyAmount, setBuyAmount] = useState('');
+  const [autoTopUp, setAutoTopUp] = useState(true);
+  const [topUpThreshold, setTopUpThreshold] = useState(100);
+  const [topUpAmount, setTopUpAmount] = useState(25);
+
+  const planCreditsRemaining = 653;
+  const planCreditsIncluded = 2500;
+  const planCreditsUsed = planCreditsIncluded - planCreditsRemaining;
+  const topUpBalance = 550;
+  const topUpMax = 1000;
+  const pricePerCredit = 0.04;
+  const maxBuyable = topUpMax - topUpBalance;
 
   const plans = [
     {
       id: 'web',
       name: 'Web-only',
+      icon: Globe,
       subtitle: 'Basic chat features for simple AI agents on a website.',
       price: null,
       priceLabel: 'Pay-as-you-go',
       priceSubtext: 'Credit bundles starting at $25',
       credits: '1,000 Starter Credits',
       popular: false,
+      ctaLabel: 'Get started',
+      ctaStyle: 'outline',
       features: [
         'Plug-and-play no-code web widget',
         'SOC 2, ISO 27001, GDPR compliant',
@@ -1622,12 +1659,15 @@ function PricingView() {
     {
       id: 'core',
       name: 'Core',
+      icon: Zap,
       subtitle: 'Full-featured chat, moderation, and analytics for production AI agents.',
       price: billingCycle === 'annual' ? 99 : 124,
       priceLabel: '/month',
-      priceSubtext: 'Billed annually',
+      priceSubtext: billingCycle === 'annual' ? 'Billed annually' : 'Billed monthly',
       credits: '2,500 Monthly Credits',
       popular: true,
+      ctaLabel: 'Upgrade to Core',
+      ctaStyle: 'primary',
       features: [
         'UI Kits for all popular web & mobile frameworks',
         'AI moderation & guardrails',
@@ -1642,14 +1682,17 @@ function PricingView() {
     {
       id: 'plus',
       name: 'Plus',
+      icon: Sparkles,
       subtitle: 'Advanced personalization for complex, multi-step AI agents.',
       price: billingCycle === 'annual' ? 999 : 1249,
       priceLabel: '/month',
-      priceSubtext: 'Billed annually',
+      priceSubtext: billingCycle === 'annual' ? 'Billed annually' : 'Billed monthly',
       credits: '25,000 Monthly Credits',
       popular: false,
+      ctaLabel: 'Upgrade to Plus',
+      ctaStyle: 'dark',
+      featuresHeader: 'Everything in Core, plus:',
       features: [
-        'Everything in Core, plus:',
         'Tasks, workflows & multi-model support',
         'User authentication & memory',
         'Role-based access control (including content)',
@@ -1658,157 +1701,1066 @@ function PricingView() {
     },
   ];
 
+  const tabs = [
+    { id: 'plans', label: 'Plans' },
+    { id: 'credits', label: 'Credits' },
+    { id: 'billing', label: 'Billing' },
+  ];
+
+  const openCheckout = (planId) => {
+    setCheckout({ planId, step: 'payment' });
+  };
+
+  const completeCheckout = () => {
+    if (!checkout) return;
+    setIsProcessing(true);
+    setTimeout(() => {
+      setIsProcessing(false);
+      setCheckout({ ...checkout, step: 'success' });
+    }, 1400);
+  };
+
+  const finishCheckout = () => {
+    if (checkout) setCurrentPlanId(checkout.planId);
+    setAccountState('paid-active');
+    setCheckout(null);
+    setCardName(''); setCardNumber(''); setCardExpiry(''); setCardCvc(''); setBillingEmail('');
+  };
+
+  const demoStates = [
+    { id: 'trial-active', label: 'Trial active' },
+    { id: 'trial-ending', label: 'Trial ending' },
+    { id: 'trial-expired', label: 'Trial expired' },
+    { id: 'paid-active', label: 'Paid plan' },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Header - Dashboard Style */}
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-6">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">Pricing</h2>
-          <p className="text-gray-500 mt-1">Simple, transparent, predictable. Know exactly what you'll pay.</p>
+          <h2 className="text-xl font-semibold text-gray-900">Pricing &amp; Credits</h2>
+          <p className="text-gray-500 mt-1">Manage your AI agent plan, credits, and billing.</p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg">
-          <span className={`text-xs ${billingCycle === 'monthly' ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>Monthly</span>
-          <button
-            onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annual' : 'monthly')}
-            className="relative w-9 h-5 rounded-full transition-colors"
-            style={{ backgroundColor: billingCycle === 'annual' ? theme.accent : '#d1d5db' }}
-          >
-            <div
-              className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${
-                billingCycle === 'annual' ? 'translate-x-4' : 'translate-x-0.5'
-              }`}
-            />
-          </button>
-          <span className={`text-xs ${billingCycle === 'annual' ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>Annual</span>
-          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded" style={{ backgroundColor: theme.accentLight, color: theme.accent }}>
-            -20%
-          </span>
+        <div className="flex flex-col items-end gap-1">
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Demo state</span>
+          <div className="inline-flex items-center p-1 bg-gray-100 rounded-lg">
+            {demoStates.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setAccountState(s.id)}
+                className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                  accountState === s.id ? 'bg-white text-gray-900 font-medium shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Current Plan Banner */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: theme.accentLight }}>
-            <Sparkles className="w-5 h-5" style={{ color: theme.accent }} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-gray-900">Free Trial</h3>
-              <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-green-100 text-green-700">Active</span>
-            </div>
-            <p className="text-xs text-gray-500">You're currently on the free trial plan</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <div className="text-sm font-semibold text-gray-900">1,000 Credits</div>
-            <p className="text-xs text-gray-500">Included with trial</p>
-          </div>
+      {/* Tabs */}
+      <div className="inline-flex items-center gap-1 p-1 bg-gray-100 rounded-lg">
+        {tabs.map((tab) => (
           <button
-            onClick={() => setShowContactModal(true)}
-            className="px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-colors"
-            style={{ backgroundColor: theme.accent }}
-          >
-            Contact us
-          </button>
-        </div>
-      </div>
-
-      {/* Plan Cards */}
-      <div className="grid grid-cols-4 gap-4">
-        {plans.map((plan) => (
-          <div
-            key={plan.id}
-            className={`bg-white rounded-xl border p-6 flex flex-col ${
-              plan.popular ? 'border-2 relative' : 'border-gray-200'
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              activeTab === tab.id
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
             }`}
-            style={plan.popular ? { borderColor: theme.accent } : {}}
           >
-            {plan.popular && (
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'plans' && (
+        <>
+          {/* Lifecycle Banner — varies by accountState */}
+          {accountState === 'trial-active' && (
+            <div className="relative overflow-hidden rounded-xl border border-gray-200 p-5" style={{ background: `linear-gradient(135deg, ${theme.accentLight} 0%, #ffffff 100%)` }}>
+              <div className="flex items-start justify-between gap-6">
+                <div className="flex items-start gap-4 flex-1">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm bg-white">
+                    <Sparkles className="w-5 h-5" style={{ color: theme.accent }} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-base font-semibold text-gray-900">Free Trial</h3>
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-green-100 text-green-700 uppercase tracking-wide">Active</span>
+                      <span className="text-xs text-gray-500">· {trialDaysLeft} days left</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">You're on the free trial. Upgrade anytime to unlock production features.</p>
+                    <div className="max-w-md">
+                      <div className="flex items-center justify-between text-xs mb-1.5">
+                        <span className="text-gray-600">{trialCreditsUsed} / {trialCreditsTotal.toLocaleString()} credits used</span>
+                        <span className="font-medium text-gray-900">{trialCreditsTotal - trialCreditsUsed} left</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/70 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${(trialCreditsUsed/trialCreditsTotal)*100}%`, backgroundColor: theme.accent }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => openCheckout('core')}
+                  className="px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-colors flex items-center gap-1.5 flex-shrink-0"
+                  style={{ backgroundColor: theme.accent }}
+                >
+                  Upgrade plan
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {accountState === 'trial-ending' && (
+            <div className="relative overflow-hidden rounded-xl border border-amber-200 p-5" style={{ background: 'linear-gradient(135deg, #FFFBEB 0%, #ffffff 100%)' }}>
+              <div className="flex items-start justify-between gap-6">
+                <div className="flex items-start gap-4 flex-1">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm bg-white">
+                    <Clock className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-base font-semibold text-gray-900">{trialDaysLeft} days left on your trial</h3>
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-700 uppercase tracking-wide">Ending soon</span>
+                    </div>
+                    <p className="text-xs text-gray-600 mb-3">Pick a plan now to avoid losing access to your agents and data.</p>
+                    <div className="max-w-md">
+                      <div className="flex items-center justify-between text-xs mb-1.5">
+                        <span className="text-gray-600">{trialCreditsUsed} / {trialCreditsTotal.toLocaleString()} credits used</span>
+                        <span className="font-medium text-amber-700">{trialCreditsTotal - trialCreditsUsed} left</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/70 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-amber-500" style={{ width: `${(trialCreditsUsed/trialCreditsTotal)*100}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => openCheckout('core')}
+                  className="px-4 py-2 text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-colors flex items-center gap-1.5 flex-shrink-0 shadow-sm"
+                  style={{ backgroundColor: theme.accent }}
+                >
+                  Choose a plan
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {accountState === 'trial-expired' && (
+            <div className="relative overflow-hidden rounded-xl border-2 border-red-200 p-5" style={{ background: 'linear-gradient(135deg, #FEF2F2 0%, #ffffff 100%)' }}>
+              <div className="flex items-start justify-between gap-6">
+                <div className="flex items-start gap-4 flex-1">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm bg-white">
+                    <Lock className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-base font-semibold text-gray-900">Your trial has ended</h3>
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-red-100 text-red-700 uppercase tracking-wide">Expired</span>
+                    </div>
+                    <p className="text-sm text-gray-700 mb-2">Your agents are read-only. Choose a plan to resume conversations and keep your data.</p>
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <span className="flex items-center gap-1.5">
+                        <Check className="w-3 h-3 text-gray-400" /> Data preserved for 30 days
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <Check className="w-3 h-3 text-gray-400" /> Instant reactivation
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => openCheckout('core')}
+                  className="px-4 py-2 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors flex items-center gap-1.5 flex-shrink-0 shadow-sm bg-red-600"
+                >
+                  Choose a plan
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {accountState === 'paid-active' && (() => {
+            const cur = plans.find((p) => p.id === currentPlanId);
+            return (
+              <div className="relative overflow-hidden rounded-xl border border-gray-200 p-5 bg-white">
+                <div className="flex items-start justify-between gap-6">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 bg-green-50">
+                      <Check className="w-5 h-5 text-green-600" strokeWidth={3} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-base font-semibold text-gray-900">{cur ? cur.name : 'Core'} plan</h3>
+                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-green-100 text-green-700 uppercase tracking-wide">Active</span>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        ${cur ? cur.price : 99}/month · Next billing 27 Jun 2026 · {planCreditsRemaining.toLocaleString()} of {planCreditsIncluded.toLocaleString()} credits left
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setActiveTab('billing')}
+                      className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Manage plan
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Toggle row */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">Choose your plan</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Switch between monthly and annual billing.</p>
+            </div>
+            <div className="inline-flex items-center p-1 bg-gray-100 rounded-lg">
+              <button
+                onClick={() => setBillingCycle('monthly')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  billingCycle === 'monthly' ? 'bg-white text-gray-900 font-medium shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingCycle('annual')}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-1.5 ${
+                  billingCycle === 'annual' ? 'bg-white text-gray-900 font-medium shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Annual
+                <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded text-white" style={{ backgroundColor: theme.accent }}>
+                  -20%
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* Plan Cards */}
+          <div className="grid grid-cols-4 gap-5 pt-3">
+            {plans.map((plan) => {
+              const Icon = plan.icon;
+              const isCurrent = accountState === 'paid-active' && plan.id === currentPlanId;
+              const planRank = { web: 0, core: 1, plus: 2 };
+              const isDowngrade = accountState === 'paid-active' && planRank[plan.id] < planRank[currentPlanId];
+              const isUpgrade = accountState === 'paid-active' && planRank[plan.id] > planRank[currentPlanId];
+              const showHighlight = plan.popular && !isCurrent;
+
+              let ctaLabel = plan.ctaLabel;
+              let ctaStyle = plan.ctaStyle;
+              if (isCurrent) { ctaLabel = 'Current plan'; ctaStyle = 'current'; }
+              else if (isDowngrade) { ctaLabel = `Downgrade to ${plan.name}`; ctaStyle = 'outline'; }
+              else if (isUpgrade) { ctaLabel = `Switch to ${plan.name}`; ctaStyle = 'primary'; }
+
+              return (
+                <div
+                  key={plan.id}
+                  className={`relative bg-white rounded-2xl p-6 flex flex-col transition-all ${
+                    isCurrent
+                      ? 'shadow-lg'
+                      : showHighlight
+                      ? 'shadow-xl shadow-purple-100/60 scale-[1.02]'
+                      : 'border border-gray-200 hover:border-gray-300 hover:shadow-md'
+                  }`}
+                  style={
+                    isCurrent
+                      ? { borderColor: '#10B981', borderWidth: '2px', borderStyle: 'solid' }
+                      : showHighlight
+                      ? { borderColor: theme.accent, borderWidth: '2px', borderStyle: 'solid' }
+                      : {}
+                  }
+                >
+                  {isCurrent && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white rounded-full shadow-sm whitespace-nowrap bg-green-600 flex items-center gap-1">
+                      <Check className="w-3 h-3" strokeWidth={3} /> Current plan
+                    </div>
+                  )}
+                  {showHighlight && !isCurrent && (
+                    <div
+                      className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white rounded-full shadow-sm whitespace-nowrap"
+                      style={{ backgroundColor: theme.accent }}
+                    >
+                      Most Popular
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: showHighlight || isCurrent ? (isCurrent ? '#10B981' : theme.accent) : theme.accentLight }}>
+                      <Icon style={{ width: 18, height: 18, color: showHighlight || isCurrent ? '#fff' : theme.accent }} />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900">{plan.name}</h3>
+                  </div>
+
+                  <p className="text-sm text-gray-500 mb-5 min-h-[60px] leading-relaxed">{plan.subtitle}</p>
+
+                  <div className="mb-5">
+                    {plan.price ? (
+                      <>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-4xl font-bold text-gray-900 tracking-tight">${plan.price}</span>
+                          <span className="text-sm text-gray-500">{plan.priceLabel}</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">{plan.priceSubtext}</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-2xl font-bold text-gray-900 tracking-tight">{plan.priceLabel}</div>
+                        <p className="text-xs text-gray-400 mt-1">{plan.priceSubtext}</p>
+                      </>
+                    )}
+                  </div>
+
+                  <div
+                    className="rounded-lg px-3 py-2 mb-5 flex items-center gap-2"
+                    style={{ backgroundColor: theme.accentLight }}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 flex-shrink-0" style={{ color: theme.accent }} />
+                    <span className="text-xs font-medium" style={{ color: theme.accent }}>{plan.credits}</span>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (isCurrent) return;
+                      openCheckout(plan.id);
+                    }}
+                    disabled={isCurrent}
+                    className={`w-full py-2.5 rounded-lg text-sm font-semibold mb-5 transition-all flex items-center justify-center gap-1.5 ${
+                      ctaStyle === 'current'
+                        ? 'bg-green-50 text-green-700 border-2 border-green-200 cursor-default'
+                        : ctaStyle === 'outline'
+                        ? 'border-2 border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                        : ctaStyle === 'dark'
+                        ? 'bg-gray-900 text-white hover:bg-gray-800'
+                        : 'text-white hover:opacity-90 shadow-sm'
+                    }`}
+                    style={ctaStyle === 'primary' ? { backgroundColor: theme.accent } : {}}
+                  >
+                    {ctaStyle === 'current' && <Check className="w-4 h-4" strokeWidth={3} />}
+                    {ctaLabel}
+                  </button>
+
+                  <div className="border-t border-gray-100 pt-5 flex-1">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                      {plan.featuresHeader || "What's included"}
+                    </p>
+                    <ul className="space-y-2.5">
+                      {plan.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-sm text-gray-600 leading-relaxed">
+                          <span className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: theme.accentLight }}>
+                            <Check className="w-2.5 h-2.5" style={{ color: theme.accent }} strokeWidth={3} />
+                          </span>
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Done-for-you Card */}
+            <div
+              className="relative rounded-2xl p-6 flex flex-col overflow-hidden"
+              style={{ backgroundColor: '#0F172A' }}
+            >
               <div
-                className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 text-xs font-medium text-white rounded-full"
+                className="absolute -top-16 -right-16 w-48 h-48 rounded-full opacity-25 pointer-events-none"
+                style={{ background: `radial-gradient(circle, ${theme.accent} 0%, transparent 70%)` }}
+              />
+
+              <div className="relative flex items-center gap-2.5 mb-3">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: theme.accent }}>
+                  <Rocket className="w-4 h-4 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold text-white">Done-for-you</h3>
+              </div>
+
+              <p className="relative text-sm text-gray-300 mb-5 min-h-[60px] leading-relaxed">
+                AI agents, built and deployed end-to-end by our team.
+              </p>
+
+              <div className="relative mb-5">
+                <div className="text-2xl font-bold text-white tracking-tight">Let's talk</div>
+                <p className="text-xs text-gray-400 mt-1">Custom pricing per engagement</p>
+              </div>
+
+              <div
+                className="relative rounded-lg px-3 py-2 mb-5 flex items-center gap-2"
+                style={{ backgroundColor: 'rgba(104, 82, 214, 0.2)' }}
+              >
+                <Users className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#C7B8FF' }} />
+                <span className="text-xs font-medium" style={{ color: '#C7B8FF' }}>Dedicated team included</span>
+              </div>
+
+              <button
+                onClick={() => setShowContactModal(true)}
+                className="relative w-full py-2.5 rounded-lg text-sm font-semibold mb-5 transition-colors text-white hover:opacity-90 shadow-sm"
                 style={{ backgroundColor: theme.accent }}
               >
-                Most Popular
+                Talk to sales
+              </button>
+
+              <div className="relative border-t border-white/10 pt-5 flex-1">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Includes</p>
+                <ul className="space-y-2.5">
+                  {[
+                    'Design, build & deploy by CometChat',
+                    'Custom integrations & workflows',
+                    'Dedicated solutions engineer',
+                    'White-glove onboarding & training',
+                  ].map((feature, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-gray-300 leading-relaxed">
+                      <span className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: theme.accent }}>
+                        <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                      </span>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
               </div>
-            )}
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">{plan.name}</h3>
-            <p className="text-sm text-gray-500 mb-4 min-h-[40px]">{plan.subtitle}</p>
-
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-5 h-5 rounded-full flex items-center justify-center" style={{ backgroundColor: theme.accentMuted }}>
-                <Check className="w-3 h-3" style={{ color: theme.accent }} />
-              </span>
-              <span className="text-sm text-gray-600">{plan.credits}</span>
-            </div>
-
-            <div className="mb-4">
-              {plan.price ? (
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-gray-900">${plan.price}</span>
-                  <span className="text-sm text-gray-500">{plan.priceLabel}</span>
-                </div>
-              ) : (
-                <div className="text-xl font-semibold text-gray-900">{plan.priceLabel}</div>
-              )}
-              <p className="text-sm text-gray-400">{plan.priceSubtext}</p>
-            </div>
-
-            <button
-              onClick={() => setShowContactModal(true)}
-              className="w-full py-2.5 rounded-lg text-sm font-medium mb-4 transition-colors text-white hover:opacity-90"
-              style={{ backgroundColor: theme.accent }}
-            >
-              Contact us
-            </button>
-
-            <div className="border-t border-gray-100 pt-4 flex-1">
-              <p className="text-sm font-medium text-gray-700 mb-3">Features:</p>
-              <ul className="space-y-2">
-                {plan.features.map((feature, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
-                    <Check className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: theme.accent }} />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
             </div>
           </div>
-        ))}
 
-        {/* Done-for-you Card */}
-        <div
-          className="rounded-xl p-6 flex flex-col border-2 border-dashed"
-          style={{ borderColor: theme.accentMuted, backgroundColor: theme.accentLight }}
-        >
-          <h3 className="text-lg font-semibold mb-2" style={{ color: theme.accent }}>Done-for-you</h3>
-          <p className="text-sm text-gray-600 mb-4 flex-1">
-            AI agents, built and deployed end-to-end. From design to deployment, we handle the full lifecycle.
-          </p>
-          <button
-            onClick={() => setShowContactModal(true)}
-            className="w-full py-2.5 rounded-lg text-sm font-medium transition-colors border hover:opacity-90"
-            style={{ borderColor: theme.accent, color: theme.accent }}
-          >
-            Contact us
-          </button>
-        </div>
-      </div>
+          {/* View Full Pricing Link */}
+          <div className="text-center">
+            <a
+              href="https://www.cometchat.com/pricing"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-sm font-medium hover:opacity-80 transition-opacity"
+              style={{ color: theme.accent }}
+            >
+              View full pricing details
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          </div>
+        </>
+      )}
 
-      {/* View Full Pricing Link */}
-      <div className="text-center">
-        <a
-          href="https://www.cometchat.com/pricing"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-sm font-medium hover:opacity-80 transition-opacity"
-          style={{ color: theme.accent }}
-        >
-          View full pricing details
-          <ExternalLink className="w-4 h-4" />
-        </a>
-      </div>
+      {activeTab === 'credits' && (() => {
+        const totalAvailable = planCreditsRemaining + topUpBalance;
+        const planPct = (planCreditsUsed / planCreditsIncluded) * 100;
+        const topUpPct = (topUpBalance / topUpMax) * 100;
+        const buyTotal = (Number(buyAmount) || 0) * pricePerCredit;
+        return (
+          <div className="space-y-6">
+            {/* Section heading */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">AI Agent Credits</h3>
+              <p className="text-sm text-gray-500 mt-1">Track usage and top up credits when you need them.</p>
+            </div>
+
+            {/* Hero: Total credits available */}
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200 p-6" style={{ background: `linear-gradient(135deg, ${theme.accentLight} 0%, #ffffff 60%)` }}>
+              <div className="flex items-start justify-between gap-6 mb-5">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Total credits available</p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-5xl font-bold text-gray-900 tracking-tight">{totalAvailable.toLocaleString()}</span>
+                    <span className="text-base text-gray-500">credits</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">
+                    {planCreditsRemaining.toLocaleString()} from plan · {topUpBalance.toLocaleString()} from top-ups
+                  </p>
+                </div>
+                <span className="px-2.5 py-1 text-[10px] font-semibold rounded-full bg-green-100 text-green-700 uppercase tracking-wide flex-shrink-0">
+                  Healthy
+                </span>
+              </div>
+              <div>
+                <div className="w-full h-2 bg-white/80 rounded-full overflow-hidden flex">
+                  <div className="h-full" style={{ width: `${(planCreditsRemaining / (planCreditsIncluded + topUpMax)) * 100}%`, backgroundColor: theme.accent }} />
+                  <div className="h-full" style={{ width: `${(topUpBalance / (planCreditsIncluded + topUpMax)) * 100}%`, backgroundColor: theme.accentMuted }} />
+                </div>
+                <div className="flex items-center gap-4 mt-3 text-xs text-gray-600">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: theme.accent }} />
+                    Plan credits
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: theme.accentMuted }} />
+                    Top-up credits
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Breakdown: Plan + Top-up */}
+            <div className="grid grid-cols-2 gap-5">
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-md flex items-center justify-center" style={{ backgroundColor: theme.accentLight }}>
+                      <Sparkles className="w-3.5 h-3.5" style={{ color: theme.accent }} />
+                    </div>
+                    <h4 className="text-sm font-semibold text-gray-900">Plan credits</h4>
+                  </div>
+                  <span className="text-[11px] text-gray-500">Resets monthly</span>
+                </div>
+                <div className="flex items-baseline gap-1.5 mb-1">
+                  <span className="text-3xl font-bold text-gray-900 tracking-tight">{planCreditsRemaining.toLocaleString()}</span>
+                  <span className="text-sm text-gray-500">/ {planCreditsIncluded.toLocaleString()}</span>
+                </div>
+                <p className="text-xs text-gray-500 mb-4">{planCreditsUsed.toLocaleString()} used this cycle</p>
+                <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${planPct}%`, backgroundColor: theme.accent }} />
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-md flex items-center justify-center bg-gray-100">
+                      <Plus className="w-3.5 h-3.5 text-gray-700" />
+                    </div>
+                    <h4 className="text-sm font-semibold text-gray-900">Top-up credits</h4>
+                  </div>
+                  <span className="text-[11px] text-gray-500">Never expire</span>
+                </div>
+                <div className="flex items-baseline gap-1.5 mb-1">
+                  <span className="text-3xl font-bold text-gray-900 tracking-tight">{topUpBalance.toLocaleString()}</span>
+                  <span className="text-sm text-gray-500">/ {topUpMax.toLocaleString()} max</span>
+                </div>
+                <p className="text-xs text-gray-500 mb-4">{maxBuyable.toLocaleString()} more you can purchase</p>
+                <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${topUpPct}%`, backgroundColor: theme.accentMuted }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Buy Credits — primary action */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-start justify-between mb-5">
+                <div>
+                  <h4 className="text-base font-semibold text-gray-900">Buy credits</h4>
+                  <p className="text-xs text-gray-500 mt-0.5">${pricePerCredit.toFixed(2)} per credit · Charged immediately</p>
+                </div>
+              </div>
+
+              <p className="text-xs font-medium text-gray-600 mb-2">Quick amounts</p>
+              <div className="flex items-center gap-2 mb-5">
+                {[100, 200, 500].map((amt) => {
+                  const disabled = amt > maxBuyable;
+                  const selected = String(buyAmount) === String(amt);
+                  return (
+                    <button
+                      key={amt}
+                      disabled={disabled}
+                      onClick={() => setBuyAmount(amt)}
+                      className={`px-4 py-1.5 text-sm rounded-md border transition-colors ${
+                        disabled
+                          ? 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed'
+                          : selected
+                          ? 'text-white border-transparent'
+                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                      }`}
+                      style={selected && !disabled ? { backgroundColor: theme.accent } : {}}
+                    >
+                      {amt}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setBuyAmount(maxBuyable)}
+                  className={`px-4 py-1.5 text-sm rounded-md border transition-colors ${
+                    String(buyAmount) === String(maxBuyable)
+                      ? 'text-white border-transparent'
+                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                  }`}
+                  style={String(buyAmount) === String(maxBuyable) ? { backgroundColor: theme.accent } : {}}
+                >
+                  Max ({maxBuyable.toLocaleString()})
+                </button>
+              </div>
+
+              <div className="flex items-end gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Amount</label>
+                  <input
+                    type="number"
+                    value={buyAmount}
+                    onChange={(e) => setBuyAmount(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-gray-400"
+                  />
+                </div>
+                <div className="text-right pb-2">
+                  <p className="text-[11px] text-gray-500">Total</p>
+                  <p className="text-xl font-bold text-gray-900 tracking-tight">${buyTotal.toFixed(2)}</p>
+                </div>
+                <button
+                  disabled={!buyAmount || Number(buyAmount) <= 0}
+                  className="px-5 py-2 text-white rounded-md text-sm font-semibold hover:opacity-90 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: theme.accent }}
+                >
+                  Buy Now
+                </button>
+              </div>
+            </div>
+
+            {/* Auto Top-up — settings */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-start justify-between mb-5">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h4 className="text-base font-semibold text-gray-900">Auto top-up</h4>
+                    {autoTopUp && (
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-green-100 text-green-700 uppercase tracking-wide">On</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500">Automatically purchase credits when balance runs low. Requires an active plan.</p>
+                </div>
+                <button
+                  onClick={() => setAutoTopUp(!autoTopUp)}
+                  className="relative w-10 h-5 rounded-full transition-colors flex-shrink-0 mt-1"
+                  style={{ backgroundColor: autoTopUp ? theme.accent : '#d1d5db' }}
+                >
+                  <div
+                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${
+                      autoTopUp ? 'translate-x-[22px]' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className={`grid grid-cols-2 gap-4 mb-5 transition-opacity ${!autoTopUp ? 'opacity-40 pointer-events-none' : ''}`}>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Trigger threshold</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={topUpThreshold}
+                      onChange={(e) => setTopUpThreshold(Number(e.target.value))}
+                      className="w-full pl-3 pr-20 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-gray-400"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">credits</span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-1">When total credits fall below this</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Top-up amount</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={topUpAmount}
+                      onChange={(e) => setTopUpAmount(Number(e.target.value))}
+                      className="w-full pl-3 pr-24 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-gray-400"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                      = ${(topUpAmount * pricePerCredit).toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-1">Credits added per auto top-up</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  disabled={!autoTopUp}
+                  className="px-5 py-2 text-white rounded-md text-sm font-semibold hover:opacity-90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: theme.accent }}
+                >
+                  Save settings
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {activeTab === 'billing' && (() => {
+        const isPaid = accountState === 'paid-active';
+        const cur = isPaid ? plans.find((p) => p.id === currentPlanId) : null;
+        return (
+          <div className="space-y-4 max-w-3xl">
+            {/* Current Plan */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Current plan</p>
+                  {isPaid && cur ? (
+                    <>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-xl font-semibold text-gray-900">{cur.name}</h4>
+                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-green-100 text-green-700 uppercase tracking-wide">Active</span>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        ${cur.price}/month · Next billing date <span className="font-semibold text-gray-900">27 Jun 2026</span>
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-xl font-semibold text-gray-900">Free Trial</h4>
+                        <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full uppercase tracking-wide ${
+                          accountState === 'trial-expired' ? 'bg-red-100 text-red-700' : accountState === 'trial-ending' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+                        }`}>
+                          {accountState === 'trial-expired' ? 'Expired' : accountState === 'trial-ending' ? 'Ending soon' : 'Active'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {accountState === 'trial-expired'
+                          ? 'Trial ended. Choose a plan to resume.'
+                          : `${trialDaysLeft} days remaining · 1,000 trial credits`}
+                      </p>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={() => setActiveTab('plans')}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                    isPaid ? 'text-gray-700 border border-gray-200 hover:bg-gray-50' : 'text-white shadow-sm hover:opacity-90'
+                  }`}
+                  style={!isPaid ? { backgroundColor: theme.accent } : {}}
+                >
+                  {isPaid ? 'Change plan' : 'Choose a plan'}
+                </button>
+              </div>
+              {isPaid && (
+                <div className="border-t border-gray-100 pt-4 grid grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Billing cycle</p>
+                    <p className="text-sm font-medium text-gray-900">Annual · Save 20%</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Credits included</p>
+                    <p className="text-sm font-medium text-gray-900">{planCreditsIncluded.toLocaleString()} / month</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-gray-500 uppercase tracking-wider mb-1">Renews on</p>
+                    <p className="text-sm font-medium text-gray-900">27 Jun 2026</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Payment Method */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Payment method</p>
+                  {isPaid ? (
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-7 rounded bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+                        <span className="text-[9px] font-bold text-white">VISA</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Visa ending in 4242</p>
+                        <p className="text-xs text-gray-500">Expires 08 / 2028</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No payment method added</p>
+                  )}
+                </div>
+                <button className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-md hover:bg-gray-50 transition-colors">
+                  {isPaid ? 'Update' : 'Add'}
+                </button>
+              </div>
+            </div>
+
+            {/* Billing History */}
+            {isPaid && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Recent invoices</p>
+                <div className="divide-y divide-gray-100">
+                  {[
+                    { date: '27 May 2026', amount: cur ? cur.price : 99, status: 'Paid' },
+                    { date: '27 Apr 2026', amount: cur ? cur.price : 99, status: 'Paid' },
+                    { date: '27 Mar 2026', amount: cur ? cur.price : 99, status: 'Paid' },
+                  ].map((inv, i) => (
+                    <div key={i} className="py-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{inv.date}</p>
+                        <p className="text-xs text-gray-500">{cur ? cur.name : 'Core'} plan · monthly</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm font-medium text-gray-900">${inv.amount}.00</span>
+                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-green-100 text-green-700">{inv.status}</span>
+                        <button className="text-xs font-medium text-gray-500 hover:text-gray-900">Download</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Danger zone */}
+            {isPaid && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Cancel subscription</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600">Cancel anytime. You'll keep access until {cur ? '27 Jun 2026' : 'end of cycle'}.</p>
+                  <button
+                    onClick={() => { setAccountState('trial-expired'); setActiveTab('plans'); }}
+                    className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition-colors"
+                  >
+                    Cancel plan
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Checkout Modal */}
+      {checkout && (() => {
+        const plan = plans.find((p) => p.id === checkout.planId) || plans[1];
+        const monthlyPrice = plan.price || 99;
+        const cycle = billingCycle === 'annual' ? 'annual' : 'monthly';
+        const subtotal = cycle === 'annual' ? monthlyPrice * 12 : monthlyPrice;
+        const annualSavings = cycle === 'annual' ? Math.round(monthlyPrice * 12 * 0.2) : 0;
+        const total = subtotal;
+
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl my-8 overflow-hidden">
+              {checkout.step === 'payment' && (
+                <>
+                  {/* Modal header */}
+                  <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <h3 className="text-base font-semibold text-gray-900">Upgrade to {plan.name}</h3>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="flex items-center gap-1.5 font-medium" style={{ color: theme.accent }}>
+                          <span className="w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-semibold" style={{ backgroundColor: theme.accent }}>1</span>
+                          Payment
+                        </span>
+                        <ChevronRight className="w-3 h-3 text-gray-300" />
+                        <span className="flex items-center gap-1.5 text-gray-400">
+                          <span className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-semibold">2</span>
+                          Confirm
+                        </span>
+                      </div>
+                    </div>
+                    <button onClick={() => setCheckout(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Two-column body */}
+                  <div className="grid grid-cols-5 divide-x divide-gray-100">
+                    {/* Order summary */}
+                    <div className="col-span-2 p-6" style={{ backgroundColor: '#FAFAFA' }}>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Order summary</p>
+
+                      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+                        <div className="flex items-center gap-2.5 mb-3">
+                          <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: theme.accent }}>
+                            {React.createElement(plan.icon, { style: { width: 18, height: 18, color: '#fff' } })}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{plan.name} plan</p>
+                            <p className="text-xs text-gray-500">{plan.credits}</p>
+                          </div>
+                        </div>
+
+                        <div className="inline-flex items-center p-0.5 bg-gray-100 rounded-md mb-4">
+                          <button
+                            onClick={() => setBillingCycle('monthly')}
+                            className={`px-2.5 py-1 text-xs rounded transition-colors ${
+                              cycle === 'monthly' ? 'bg-white text-gray-900 font-medium shadow-sm' : 'text-gray-500'
+                            }`}
+                          >
+                            Monthly
+                          </button>
+                          <button
+                            onClick={() => setBillingCycle('annual')}
+                            className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center gap-1 ${
+                              cycle === 'annual' ? 'bg-white text-gray-900 font-medium shadow-sm' : 'text-gray-500'
+                            }`}
+                          >
+                            Annual
+                            <span className="text-[9px] font-semibold" style={{ color: theme.accent }}>-20%</span>
+                          </button>
+                        </div>
+
+                        <div className="space-y-2 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-600">{plan.name} ({cycle})</span>
+                            <span className="text-gray-900 font-medium">${subtotal}.00</span>
+                          </div>
+                          {annualSavings > 0 && (
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-green-600">Annual discount (20%)</span>
+                              <span className="text-green-600 font-medium">−${annualSavings}.00</span>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-500">Tax</span>
+                            <span className="text-gray-500">Calculated at checkout</span>
+                          </div>
+                        </div>
+
+                        <div className="border-t border-gray-100 mt-3 pt-3 flex items-baseline justify-between">
+                          <span className="text-sm font-semibold text-gray-900">Total due today</span>
+                          <div className="text-right">
+                            <span className="text-2xl font-bold text-gray-900 tracking-tight">${total - annualSavings}</span>
+                            <span className="text-xs text-gray-500 ml-1">USD</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">What you get</p>
+                      <ul className="space-y-1.5">
+                        {plan.features.slice(0, 5).map((f, i) => (
+                          <li key={i} className="flex items-start gap-2 text-xs text-gray-600">
+                            <Check className="w-3 h-3 mt-0.5 flex-shrink-0" style={{ color: theme.accent }} strokeWidth={3} />
+                            {f}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Payment form */}
+                    <div className="col-span-3 p-6">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Payment details</p>
+
+                      <div className="space-y-3 mb-5">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Cardholder name</label>
+                          <input
+                            value={cardName}
+                            onChange={(e) => setCardName(e.target.value)}
+                            placeholder="Pourav Raj"
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-gray-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Card number</label>
+                          <div className="relative">
+                            <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input
+                              value={cardNumber}
+                              onChange={(e) => setCardNumber(e.target.value)}
+                              placeholder="1234 5678 9012 3456"
+                              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-gray-400"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Expiry</label>
+                            <input
+                              value={cardExpiry}
+                              onChange={(e) => setCardExpiry(e.target.value)}
+                              placeholder="MM / YY"
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-gray-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">CVC</label>
+                            <input
+                              value={cardCvc}
+                              onChange={(e) => setCardCvc(e.target.value)}
+                              placeholder="123"
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-gray-400"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Billing email</label>
+                          <input
+                            type="email"
+                            value={billingEmail}
+                            onChange={(e) => setBillingEmail(e.target.value)}
+                            placeholder="pourav.raj@cometchat.com"
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-gray-400"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 mb-4 text-xs text-gray-500">
+                        <Lock className="w-3.5 h-3.5" />
+                        Secured by Stripe · Your card details never touch our servers
+                      </div>
+
+                      <button
+                        onClick={completeCheckout}
+                        disabled={isProcessing}
+                        className="w-full py-3 text-white rounded-lg text-sm font-semibold transition-colors shadow-sm hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        style={{ backgroundColor: theme.accent }}
+                      >
+                        {isProcessing ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Processing payment…
+                          </>
+                        ) : (
+                          <>
+                            Pay ${total - annualSavings} &amp; activate {plan.name}
+                            <ChevronRight className="w-4 h-4" />
+                          </>
+                        )}
+                      </button>
+                      <p className="text-[11px] text-gray-400 text-center mt-2">
+                        By confirming you agree to CometChat's Terms of Service. Cancel anytime.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {checkout.step === 'success' && (
+                <div className="p-10 text-center">
+                  <div className="w-20 h-20 rounded-full mx-auto mb-5 flex items-center justify-center bg-green-50 border-4 border-green-100">
+                    <Check className="w-10 h-10 text-green-600" strokeWidth={3} />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2 tracking-tight">You're on the {plan.name} plan</h3>
+                  <p className="text-sm text-gray-600 mb-6 max-w-md mx-auto">
+                    Welcome aboard. Your agents are unlocked and ready for production. A receipt has been sent to your email.
+                  </p>
+
+                  <div className="bg-gray-50 rounded-xl p-4 max-w-md mx-auto mb-6 text-left">
+                    <div className="flex items-center justify-between py-2 border-b border-gray-200 text-sm">
+                      <span className="text-gray-500">Plan</span>
+                      <span className="text-gray-900 font-medium">{plan.name} · {cycle}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-gray-200 text-sm">
+                      <span className="text-gray-500">Credits added</span>
+                      <span className="text-gray-900 font-medium">{plan.credits}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 text-sm">
+                      <span className="text-gray-500">Next billing</span>
+                      <span className="text-gray-900 font-medium">27 Jun 2026</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      onClick={() => { finishCheckout(); setActiveTab('billing'); }}
+                      className="px-5 py-2.5 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      View billing
+                    </button>
+                    <button
+                      onClick={finishCheckout}
+                      className="px-5 py-2.5 text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm flex items-center gap-2"
+                      style={{ backgroundColor: theme.accent }}
+                    >
+                      Go to dashboard
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Contact Modal */}
       {showContactModal && (
